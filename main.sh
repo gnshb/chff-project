@@ -2,7 +2,7 @@
 
 g++ -lm -fopenmp main.cpp;
 ./a.out | tee ad.txt;
-#!/bin/bash
+#!/bin/sh
 
 # Input file
 INPUT_FILE="ad.txt"
@@ -41,9 +41,13 @@ gnuplot -persist <<-EOF
     set xlabel "Index"
     set ylabel "Value"
     set key outside
-    plot "plot_data.dat" using 1:2 with lines title "Mass Flow Rate", \
-         "plot_data.dat" using 1:3 with lines title "u", \
-         "plot_data.dat" using 1:4 with lines title "p"
+    set style line 1 lt rgb "blue" lw 2 pt 7 ps 1.2
+    set style line 2 lt rgb "green" lw 2 pt 7 ps 1.2
+    # set style line 3 lt rgb "red" lw 2 pt 7 ps 1.2
+
+    plot "plot_data.dat" using 1:2 with linespoints linestyle 1 title "Mass Flow Rate", \
+         "plot_data.dat" using 1:3 with linespoints linestyle 2 title "u",
+         # "plot_data.dat" using 1:4 with linespoints linestyle 3 title "p"
 EOF
 
 rm ad.txt;

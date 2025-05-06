@@ -40,23 +40,24 @@
 #endif
 
 //  Parameters
-const int N = 20;            //  Number of points
-const double THRESH = 1E-6;  //  Outer Iteration L2 norm threshold
+const int N = 10;            //  Number of points
+const double THRESH = 2E-1;  //  Outer Iteration L2 norm threshold
+// const double THRESH = 1E-2;  //  Outer Iteration L2 norm threshold
 const double OMEGAu = 0.05;  //  Momentum relaxation coefficient
 const double OMEGAp = 0.05;  //  Pressure relaxation coefficient
 // const double OMEGAu = 0.02;  //  Momentum relaxation coefficient
 // const double OMEGAp = 0.02;  //  Pressure relaxation coefficient
 const double MAXITER = 1E6;  //  Maximum iterations
 const int DEBUG = 0;         //  Print extra information
-const int printint = 10;     //  Interval to print convergence information
+const int printint = 1;     //  Interval to print convergence information
 const int METHOD = 0;        //  0 = SIMPLE, 1 = SIMPLER
 
 //  Global Constants
 const double L = 2.0;    //  Length of domain (1D)
 const double Ai = 0.1;   //  Initial area in meters squared
-const double Af = 1.0;   //  Final area in meters squared
+const double Af = 0.01;   //  Final area in meters squared
 const double rho = 1.0;  //  Fluid density
-const double Pi = 10;    //  Inlet pressure
+const double Pi = 1e14;    //  Inlet pressure
 const double Po = 0;     //  Outlet pressure
 const double Mi = 1.0;   //  initial mass flow rate
 const double OmOMEGAu = 1.0 - OMEGAu;
@@ -64,8 +65,8 @@ const double OmOMEGAp = 1.0 - OMEGAp;
 const int Nm1 = N - 1;
 const int Nm2 = N - 2;
 const double dx = L / Nm1;  //  delta x
-const double THRESHinner =
-    THRESH / 150.0;               //  Inner iteration residual threshold
+const double THRESHinner = THRESH;
+    //THRESH / 150.0;               //  Inner iteration residual threshold
 const double Mexact = sqrt(0.2);  //  Exact solution mass flow rate
 const double De = 0.0, Dw = 0.0;  //  Diffusion coefficients
 
@@ -186,6 +187,7 @@ int main() {
     //  Outer iterations
     start = omp_get_wtime();
     for (int outer = 0; outer < MAXITER; outer++) {
+	//printf("hii\n");
         //  Save previous iteration values
         pPrev = p;
         uPrev = u;
@@ -230,7 +232,8 @@ int main() {
             p[Nm1] = 0.0;
 
             //  Iterate until pressure residual converges
-            while (dif > THRESH) {
+	    //std::cout<<"sad\n";
+	        while (dif > THRESH) {
                 dif = 0.0;
 #pragma omp parallel for private(temp, PP, rhs) reduction(+ : dif)
                 for (int i = 1; i < Nm1; i++) {
@@ -243,6 +246,7 @@ int main() {
                     p[i] = PP;
                 }
                 dif = sqrt(dif / Nm2);
+		//std::cout<<(dif)<<std::endl;
                 Pcount++;
                 if (DEBUG) std::cout << dif << std::endl;
             }
@@ -293,7 +297,7 @@ int main() {
                     }
                 }
                 //  calculate residual
-                dif += P2(rhs - aPu[i] * UP);
+                dif += P2(rhs - aPu[i] * UP);///P2(rhs);
                 temp = UP;
                 UP = rhs * aPuinv[i];
                 //  Under-relaxation
@@ -301,10 +305,12 @@ int main() {
                 uStar[i] = UP;
             }
             dif = sqrt(dif / Nm1);
+            std::cout<<dif<<" "<<THRESHinner<<std::endl;
             Mcount++;
 
             if (DEBUG) std::cout << dif << std::endl;
         }
+        //std::cout<<"sad\n";
 #endif
 
         if (DEBUG) printMatrix("uStar", uStar);
@@ -339,7 +345,7 @@ int main() {
                 rhs = aWp[i] * pPrime[i - 1] + aEp[i] * pPrime[i + 1] +
                       bPrimep[i];
                 //  calculate residual
-                dif += P2(rhs - temp * aPp[i]);
+                dif += P2(rhs - temp * aPp[i]);///P2(rhs);
                 PP = rhs * aPpinv[i];
                 //  under-relaxation
                 PP = OmOMEGAp * temp + OMEGAp * PP;
@@ -355,7 +361,7 @@ int main() {
 
         //  Correct pressure and velocity
         totaldif = 0.0;
-#pragma omp parallel for private(PP, UP, temp) reduction(+ : totaldif)
+//#pragma omp parallel for private(PP, UP, temp) reduction(+ : totaldif)
         for (int i = 0; i < Nm1; i++) {
             //  Correct all velocities
             UP = u[i];
@@ -363,7 +369,7 @@ int main() {
             UP = uStar[i] + d[i] * (pPrime[i] - pPrime[i + 1]);
             UP = OMEGAu * UP + OmOMEGAu * temp;
             u[i] = UP;
-            totaldif += P2(uPrev[i] - UP);
+            totaldif += P2(uPrev[i] - UP);///P2(UP);
 
             //  Correct pressure, except on edges
             PP = p[i];
@@ -377,12 +383,13 @@ int main() {
                     PP += pPrime[i];
             }
             if (i == 0 || METHOD != 1) p[i] = PP;
-            totaldif += P2(pPrev[i] - p[i]);
+            //std::cout<<"oho"<<totaldif<<" "<<p[i]<<std::endl;
+            totaldif += P2(pPrev[i] - p[i]);//P2(p[i]);
         }
 
         //  Calculate L2 norm of pressure and velocity difference
         if (outer == 0) totaldif0 = 1.0 / sqrt(totaldif / (2.0 * Nm1));
-
+        //std::cout<<"aaaaaa"<<totaldif<<" "<<totaldif0<<std::endl;
         totaldif = sqrt(totaldif / ((2.0 * Nm1))) * totaldif0;
 
         //  Print information
@@ -416,14 +423,16 @@ int main() {
                 break;
             }
         }
-        if (isnan(totaldif) || isinf(totaldif) || !isnormal(dif))
+        if (isnan(totaldif) || isinf(totaldif) || !isnormal(dif)){
+            std::cout<<"cry"<<isnan(totaldif) << isinf(totaldif) << !isnormal(dif) << std::endl;
             throwError("dif error\n");
+        }
     }
     return 0;
 }
 
 //  power of 2
-double P2(const double &value) { return value * value; }
+double P2(const double &value) { return abs(value) ;}//* value; }
 
 //  Prints a matrix
 template <std::size_t SIZE>
