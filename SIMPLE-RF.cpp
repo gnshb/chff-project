@@ -12,12 +12,10 @@
 #include <iostream>
 #include <vector>
 
-//#define SR
-
-double tempy;
+// #define SR
 
 //  Parameters
-const int N = 10;            //  Number of points
+const int N = 20;            //  Number of points
 const double speedoflight = 3e8;            //  Number of points
 const double THRESH = 1e-3;  //  Outer Iteration L2 norm threshold
 // const double THRESH = 1E-2;  //  Outer Iteration L2 norm threshold
@@ -34,7 +32,7 @@ const double L = 2.0;    //  Length of domain (1D)
 const double Ai = 100;   //  Initial area in meters squared
 const double Af = 1;   //  Final area in meters squared
 const double rho = 1.0;  //  Fluid density
-const double Pi = 1e17;    //  Inlet pressure
+const double Pi = 10;    //  Inlet pressure
 const double Po = 0;     //  Outlet pressure
 // const double Mi = 1000000.0;   //  initial mass flow rate
 const double Mi = pow(2 * rho * (Pi - Po) * Ai * Af / abs(pow(Af, 2) - pow(Ai, 2)), 0.5);   //  initial mass flow rate
@@ -95,10 +93,10 @@ int main(int argc, char** argv) {
     omp_set_num_threads(maxthreads);
 
     //  Print some parameters
-    printf("Threads: %d\n", maxthreads);
-    printf("dx: %.2e\n", dx);
-    printf("N: %d\n", N);
-    std::cout << std::endl;
+    // printf("Threads: %d\n", maxthreads);
+    // printf("dx: %.2e\n", dx);
+    // printf("N: %d\n", N);
+    // std::cout << std::endl;
 
     //  Initialize Variables
     const double Aslope = (Af - Ai) / L;
@@ -131,8 +129,8 @@ int main(int argc, char** argv) {
         printMatrix("p", p);
     }
 
-    printf(
-        "Iterations\tU* iters\tP' iters\tL2 norm\t\tP error\t\tU error\n");
+    // printf(
+    //     "Iterations\tU* iters\tP' iters\tL2 norm\t\tP error\t\tU error\n");
 
     //  Outer iterations
     start = omp_get_wtime();
@@ -263,10 +261,10 @@ int main(int argc, char** argv) {
         if (outer % printint == 0) {
             //  Calculate error from exact solution
             solnError(pError, uError, p, Pexsoln, u, Uexsoln);
-            printf("%.2e\t%.2e\t%.2e\t%.2e\t%.3e\t%.3e\t\n",
-                       static_cast<double>(outer), static_cast<double>(Mcount),
-                       static_cast<double>(Pprimecount), totaldif, pError,
-                       uError);
+            // printf("%.2e\t%.2e\t%.2e\t%.2e\t%.3e\t%.3e\t\n",
+            //            static_cast<double>(outer), static_cast<double>(Mcount),
+            //            static_cast<double>(Pprimecount), totaldif, pError,
+            //            uError);
 
             //  If converged, print final information
             if (totaldif < THRESH) {
@@ -278,10 +276,11 @@ int main(int argc, char** argv) {
                 #endif
 
                 stop = omp_get_wtime();
-                printMatrix("Mass Flow Rate", mfr);
+                // printMatrix("Mass Flow Rate", mfr);
+                // std::cout << "DATA" << std::endl;
                 printMatrix("u", u);
                 printMatrix("p", p);
-                printf("\nTime: %.3e s", stop - start);
+                // printf("\nTime: %.3e s", stop - start);
                 break;
             }
         }
@@ -337,7 +336,7 @@ void buildMomentumCoeffs(const Pvec &p, const Pvec &areaP, const Uvec &uPrev,
 
         #ifdef SR
 
-        double P_face = 0.5 * (p[i] + p[i + 1]);  // interior faces
+        double P_face = p[i - 1];  // interior faces
         // std::cout << p[0] << "AAAAAA" << std::endl;
         // if (i == 0){
         //     P_face = Pi;
@@ -447,8 +446,8 @@ void checkparams() {
     if (THRESH < 0 || THRESH > 1)
         throwError("Error: invalid convergence threshold\n");
 
-    if (THRESH > 1E-5)
-        printf("Warning: threshold is recommended to be at or below 1E-5\n");
+    // if (THRESH > 1E-5)
+        // printf("Warning: threshold is recommended to be at or below 1E-5\n");
 
     if (OMEGAu > 1 || OMEGAu < 0 || OMEGAp > 1 || OMEGAp < 0)
         throwError("Error: relaxation should be between 0 and 1\n");

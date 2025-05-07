@@ -144,7 +144,9 @@ def pressure_profile_normal(x, v_x, A1, A2, P1, P2, rho, c, v1_solution):
     return p_x
 
 
+f = ""
 if SR:
+    f = "sr"
     bernoulli = bernoulli_rel
     velocity_profile = velocity_profile_rel
     pressure_profile = pressure_profile_rel
@@ -163,30 +165,29 @@ v1_solution = fsolve(bernoulli, v1_guess)
 
 # Calculate the velocity profile
 x, v_x = velocity_profile(N, A1, A2, v1_solution)
-
-if plot:
-    # Plot the velocity profile
-    plt.figure(figsize=(10, 6))
-    plt.plot(x, v_x, label="Velocity Profile", color='b')
-    plt.xlabel('Position along pipe (m)')
-    plt.ylabel('Velocity (m/s)')
-    plt.title(f'{text} Velocity Profile in a Pipe with Varying Cross Section')
-    plt.grid(True)
-    plt.legend()
-    plt.show()
-
 p_x = pressure_profile(x, v_x, A1, A2, P1, P2, rho, c, v1_solution)
-
 if plot:
-    # Plot the pressure profile
-    plt.figure(figsize=(10, 6))
-    plt.plot(x, p_x, label="Pressure Profile", color='r')
-    plt.xlabel('Position along pipe (m)')
-    plt.ylabel('Pressure (kPa)')
-    plt.title(f'{text} Pressure Profile in a Pipe with Varying Cross Section')
-    plt.grid(True)
-    plt.legend()
-    plt.show()
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))  # 1 row, 2 columns
+
+    # Velocity subplot
+    ax1.plot(x, v_x, label="Velocity Profile", color='b')
+    ax1.set_xlabel('Position along pipe (m)')
+    ax1.set_ylabel('Velocity (m/s)')
+    ax1.set_title(f'{text} Velocity Profile')
+    ax1.grid(True)
+    ax1.legend()
+
+    # Pressure subplot
+    ax2.plot(x, p_x, label="Pressure Profile", color='r')
+    ax2.set_xlabel('Position along pipe (m)')
+    ax2.set_ylabel('Pressure (kPa)')
+    ax2.set_title(f'{text} Pressure Profile')
+    ax2.grid(True)
+    ax2.legend()
+
+    plt.tight_layout()
+    plt.savefig(f'analytic_{f}_A{A1}_P{P1}_N{N + 1}.png')
 
 
 if not plot:
