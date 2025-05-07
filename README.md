@@ -6,7 +6,7 @@
 
 # How to run the program
 
-- Usage: `./main.sh -A area\_of\_inlet/area\_of\_outlet -P pressure\_inlet`
+- Usage: `./main.sh -A area-of-inlet/area-of-outlet -P pressure\_inlet -N gridpoints`
 
 - Optional: `-S` for Special Relativistic Calculations, `-J` for Plotting
 
