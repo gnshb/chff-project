@@ -2,6 +2,8 @@
 // See Versteeg, An Introduction to Computational Fluid Dynamics, Example 6.2
 // Travis Burrows
 
+#include <cmath>
+#include <cstdlib>
 #include <math.h>
 #include <omp.h>
 #include <string.h>
@@ -10,29 +12,32 @@
 #include <iostream>
 #include <vector>
 
-#define SR
+//#define SR
 
+double tempy;
 
 //  Parameters
 const int N = 10;            //  Number of points
-const double THRESH = 2e-1;  //  Outer Iteration L2 norm threshold
+const double speedoflight = 3e8;            //  Number of points
+const double THRESH = 1e-3;  //  Outer Iteration L2 norm threshold
 // const double THRESH = 1E-2;  //  Outer Iteration L2 norm threshold
 const double OMEGAu = 0.05;  //  Momentum relaxation coefficient
-const double OMEGAp = 0.05;  //  Pressure relaxation coefficient
+const double OMEGAp = 0.01;  //  Pressure relaxation coefficient
 // const double OMEGAu = 0.02;  //  Momentum relaxation coefficient
 // const double OMEGAp = 0.02;  //  Pressure relaxation coefficient
-const double MAXITER = 1E6;  //  Maximum iterations
+const double MAXITER = 1E4;  //  Maximum iterations
 const int DEBUG = 0;         //  Print extra information
-const int printint = 1;     //  Interval to print convergence information
+const int printint = 10;     //  Interval to print convergence information
 
 //  Global Constants
 const double L = 2.0;    //  Length of domain (1D)
-const double Ai = 0.1;   //  Initial area in meters squared
-const double Af = 0.01;   //  Final area in meters squared
+const double Ai = 100;   //  Initial area in meters squared
+const double Af = 1;   //  Final area in meters squared
 const double rho = 1.0;  //  Fluid density
-const double Pi = 1e14;    //  Inlet pressure
+const double Pi = 1e17;    //  Inlet pressure
 const double Po = 0;     //  Outlet pressure
-const double Mi = 1.0;   //  initial mass flow rate
+// const double Mi = 1000000.0;   //  initial mass flow rate
+const double Mi = pow(2 * rho * (Pi - Po) * Ai * Af / abs(pow(Af, 2) - pow(Ai, 2)), 0.5);   //  initial mass flow rate
 const double OmOMEGAu = 1.0 - OMEGAu;
 const double OmOMEGAp = 1.0 - OMEGAp;
 const int Nm1 = N - 1;
@@ -67,7 +72,8 @@ void solnError(double &perror, double &uerror, const Pvec &p,
 void throwError(const std::string &message);
 void checkparams();
 
-int main() {
+int main(int argc, char** argv) {
+
     //  Check for valid parameters
     checkparams();
 
@@ -127,7 +133,7 @@ int main() {
 
     printf(
         "Iterations\tU* iters\tP' iters\tL2 norm\t\tP error\t\tU error\n");
-    
+
     //  Outer iterations
     start = omp_get_wtime();
     for (int outer = 0; outer < MAXITER; outer++) {
@@ -167,15 +173,15 @@ int main() {
                     }
                 }
                 //  calculate residual
-                dif += P2(rhs - aPu[i] * UP);///P2(rhs);
                 temp = UP;
                 UP = rhs * aPuinv[i];
                 //  Under-relaxation
                 UP = OmOMEGAu * temp + OMEGAu * UP;
                 uStar[i] = UP;
+                dif += P2((UP - temp) / (UP + temp));///P2(rhs);
             }
             dif = sqrt(dif / Nm1);
-            std::cout<<dif<<" "<<THRESHinner<<std::endl;
+            // std::cout<<dif<<" "<<THRESHinner<<std::endl;
             Mcount++;
 
             if (DEBUG) std::cout << dif << std::endl;
@@ -195,20 +201,25 @@ int main() {
 
 
         //  Iterate until P' converges
+        // int hi;
         while (dif > THRESHinner) {
             dif = 0.0;
-#pragma omp parallel for private(temp, PP, rhs) reduction(+ : dif)
+            #pragma omp parallel for private(temp, PP, rhs) reduction(+ : dif)
+            // hi = 0;
             for (int i = 1; i < Nm1; i++) {
                 temp = pPrime[i];
+                // std::cout << "AAADYOTTTTT" << temp << std::endl;
                 rhs = aWp[i] * pPrime[i - 1] + aEp[i] * pPrime[i + 1] +
                       bPrimep[i];
                 //  calculate residual
-                dif += P2(rhs - temp * aPp[i]);///P2(rhs);
                 PP = rhs * aPpinv[i];
                 //  under-relaxation
                 PP = OmOMEGAp * temp + OMEGAp * PP;
                 pPrime[i] = PP;
+                dif +=P2((PP - temp) / (PP + temp));
             }
+            // std::cout << "PATSALLLL" << hi << std::endl;
+            // if (hi == Nm2) break;
             dif = sqrt(dif / Nm2);
             Pprimecount++;
             if (DEBUG) std::cout << dif << std::endl;
@@ -218,7 +229,7 @@ int main() {
 
         //  Correct pressure and velocity
         totaldif = 0.0;
-//#pragma omp parallel for private(PP, UP, temp) reduction(+ : totaldif)
+#pragma omp parallel for private(PP, UP, temp) reduction(+ : totaldif)
         for (int i = 0; i < Nm1; i++) {
             //  Correct all velocities
             UP = u[i];
@@ -226,7 +237,8 @@ int main() {
             UP = uStar[i] + d[i] * (pPrime[i] - pPrime[i + 1]);
             UP = OMEGAu * UP + OmOMEGAu * temp;
             u[i] = UP;
-            totaldif += P2(uPrev[i] - UP);///P2(UP);
+            // totaldif += P2(uPrev[i] - UP);///P2(UP);
+            totaldif += P2((uPrev[i] - UP) / (uPrev[i] + UP));///P2(UP);
 
             //  Correct pressure, except on edges
             PP = p[i];
@@ -238,7 +250,8 @@ int main() {
             }
             p[i] = PP;
             //std::cout<<"oho"<<totaldif<<" "<<p[i]<<std::endl;
-            totaldif += P2(pPrev[i] - p[i]);//P2(p[i]);
+            // totaldif += P2(pPrev[i] - p[i]);//P2(p[i]);
+            totaldif += P2((pPrev[i] - p[i]) / (pPrev[i] + p[i]));//P2(p[i]);
         }
 
         //  Calculate L2 norm of pressure and velocity difference
@@ -260,6 +273,9 @@ int main() {
                 //  Calculate mass flow rate
 #pragma omp parallel for
                 for (int i = 0; i < N; i++) mfr[i] = rho * areaU[i] * u[i];
+                #ifdef SR
+                for (int i = 0; i < N; i++) u[i] = u[i] / pow(1 + pow(u[i] / speedoflight, 2), 0.5);
+                #endif
 
                 stop = omp_get_wtime();
                 printMatrix("Mass Flow Rate", mfr);
@@ -316,15 +332,23 @@ void buildMomentumCoeffs(const Pvec &p, const Pvec &areaP, const Uvec &uPrev,
     double UP{}, UE{}, UW{}, Aw{}, Ae{}, Fw{}, Fe{}, Pe{}, Pw{}, Vol{}, dPdx{};
 
 
-// #pragma omp parallel for private(UP, UE, UW, Aw, Ae, Fw, Fe, Pe, Pw, Vol, dPdx)
+#pragma omp parallel for private(UP, UE, UW, Aw, Ae, Fw, Fe, Pe, Pw, Vol, dPdx)
     for (int i = 0; i < Nm1; i++) {
 
         #ifdef SR
+
         double P_face = 0.5 * (p[i] + p[i + 1]);  // interior faces
-        double rho_new = rho + enthalpy_coeff* P_face;
+        // std::cout << p[0] << "AAAAAA" << std::endl;
+        // if (i == 0){
+        //     P_face = Pi;
+        // }
+        double rho_new = (rho + enthalpy_coeff * P_face / pow(speedoflight, 2));
         #else
         double rho_new = rho;
         #endif
+
+        // std::cout << rho_new << "AAAAAA" << std::endl;
+        // exit(0);
 
 
         //  Cell-face pressures
@@ -343,7 +367,7 @@ void buildMomentumCoeffs(const Pvec &p, const Pvec &areaP, const Uvec &uPrev,
         //  Source term
         UP = uPrev[i];
         #ifdef SR
-        Su[i] = dPdx * (1 - UP * UP) * Vol;
+        Su[i] = dPdx * (1 + enthalpy_coeff * UP * UP / pow(speedoflight, 2)) * Vol;
         #else
         Su[i] = dPdx * Vol;
         #endif
